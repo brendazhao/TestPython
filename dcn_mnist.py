@@ -11,7 +11,7 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 import tensorflow as tf
 sess = tf.InteractiveSession()
 
-def weight_variable(shape):
+def weight_variable(name, shapeW):
     '''
     Initialize weights
     :param shape: shape of weights, e.g. [w, h ,Cin, Cout] where
@@ -23,12 +23,13 @@ def weight_variable(shape):
     '''
 
     # IMPLEMENT YOUR WEIGHT_VARIABLE HERE
-    initial = tf.truncated_normal(shape, stddev=0.01)
-    return tf.Variable(initial)
+    #initial = tf.truncated_normal(shape, stddev=0.01)
+    #return tf.Variable(initial)
 
-    #return W
+    W = tf.get_variable(name, shape = shapeW, initializer = tf.contrib.layers.xavier_initializer())
+    return W
 
-def bias_variable(shape):
+def bias_variable(name, shapeB):
     '''
     Initialize biases
     :param shape: shape of biases, e.g. [Cout] where
@@ -37,10 +38,11 @@ def bias_variable(shape):
     '''
 
     # IMPLEMENT YOUR BIAS_VARIABLE HERE
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    #initial = tf.constant(0.1, shape=shape)
+    #return tf.Variable(initial)
 
-    #return b
+    b = tf.get_variable(name, shape = shapeB, initializer = tf.contrib.layers.xavier_initializer())
+    return b
 
 def conv2d(x, W):
     '''
@@ -76,8 +78,8 @@ def max_pool_2x2(x):
 
 
 def create_summaries(var, name):
-	print (var)
-	print (name)
+	#print (var)
+	#print (name)
 	mean = tf.reduce_mean(var)
 	tf.scalar_summary('mean/' + name, mean)
 	stddev = tf.sqrt(tf.reduce_sum(tf.square(var - mean)))
@@ -91,7 +93,7 @@ def create_summaries(var, name):
 def main():
     # Specify training parameters
     result_dir = './results/' # directory where the results from the training are saved
-    max_step = 101 #5500 # the maximum iterations. After max_step iterations, the training will stop no matter what
+    max_step = 5501 # the maximum iterations. After max_step iterations, the training will stop no matter what
 
     start_time = time.time() # start timing
 
@@ -105,37 +107,47 @@ def main():
     x_image = tf.reshape(x, [-1, 28, 28, 1])
 
     # first convolutional layer
-    W_conv1 = weight_variable([5, 5, 1, 32])
-    b_conv1 = bias_variable([32])
-    h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
+    W_conv1 = weight_variable("W_conv1", [5, 5, 1, 32])
+    b_conv1 = bias_variable("b_conv1", [32])
+    #h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
+    #h_conv1 = tf.tanh(conv2d(x_image, W_conv1) + b_conv1)
+    h_conv1 = tf.sigmoid(conv2d(x_image, W_conv1) + b_conv1)	
     h_pool1 = max_pool_2x2(h_conv1)
 
     # second convolutional layer
-    W_conv2 = weight_variable([5, 5, 32, 64])
-    b_conv2 = bias_variable([64])
-    h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+    W_conv2 = weight_variable("W_conv2", [5, 5, 32, 64])
+    b_conv2 = bias_variable("b_conv2", [64])
+    #h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+    #h_conv2 = tf.tanh(conv2d(h_pool1, W_conv2) + b_conv2)
+    h_conv2 = tf.sigmoid(conv2d(h_pool1, W_conv2) + b_conv2)	
     h_pool2 = max_pool_2x2(h_conv2)
 
     # densely connected layer
-    W_fc1 = weight_variable([7 * 7 * 64, 1024])
-    b_fc1 = bias_variable([1024])
+    W_fc1 = weight_variable("W_fc1", [7 * 7 * 64, 1024])
+    b_fc1 = bias_variable("b_fc1", [1024])
     h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
-    h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
+    #h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+    #h_fc1 = tf.tanh(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+    h_fc1 = tf.sigmoid(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+	
     # dropout
     keep_prob = tf.placeholder(tf.float32)
     h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
     # softmax
-    W_fc2 = weight_variable([1024, 10])
-    b_fc2 = bias_variable([10])
+    W_fc2 = weight_variable("W_fc2",[1024, 10])
+    b_fc2 = bias_variable("b_fc2",[10])
     y_conv = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
     # FILL IN THE FOLLOWING CODE TO SET UP THE TRAINING
 
     # setup training
     cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y_conv), reduction_indices=[1]))
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    #train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    train_step = tf.train.RMSPropOptimizer(1e-4).minimize(cross_entropy)
+    #train_step = tf.train.AdagradOptimizer(1e-4).minimize(cross_entropy)	
+	
+	
     correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -156,9 +168,6 @@ def main():
     create_summaries(W_fc2, "Weight_fc2")
     create_summaries(b_fc2, "bias_fc2")
     create_summaries(y_conv,"activation_fc2")
-	
-	
-	
 	
     summary_op = tf.merge_all_summaries()
 
@@ -197,9 +206,14 @@ def main():
 
         train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5}) # run one train_step
 
-    # print test error
-    print("test accuracy %g"%accuracy.eval(feed_dict={
-        x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+		
+        # Print training and validation accuracy every 1100 iterations
+        if i % 1100 == 0:		
+            # print test error
+            print("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+            # print validation error
+            print("validation accuracy %g"%accuracy.eval(feed_dict={x: mnist.validation.images, y_: mnist.validation.labels, keep_prob: 1.0}))
+	
 
     stop_time = time.time()
     print('The training takes %f second to finish'%(stop_time - start_time))
